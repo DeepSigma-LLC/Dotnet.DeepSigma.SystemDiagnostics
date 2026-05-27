@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
 
     <PackageId>DeepSigma.SystemDiagnostics</PackageId>
-    <Version>0.3.2</Version>
+    <Version>0.3.3</Version>
     <Authors>DeepSigma</Authors>
     <Company>DeepSigma</Company>
     <Description>Cross-platform (Windows/Linux) system diagnostics: OS, CPU, memory, drives, network, GPU. Returns immutable record structures suitable for branching application logic on host capabilities.</Description>
@@ -20,7 +20,6 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

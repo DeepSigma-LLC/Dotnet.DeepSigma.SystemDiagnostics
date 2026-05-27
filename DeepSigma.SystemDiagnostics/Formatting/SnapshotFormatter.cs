@@ -4,8 +4,17 @@ using DeepSigma.SystemDiagnostics.Models;
 
 namespace DeepSigma.SystemDiagnostics.Formatting;
 
+/// <summary>
+/// Extension methods that render snapshot records as human-readable, sectioned text.
+/// Suitable for log output, console dumps, and bug reports.
+/// </summary>
 public static class SnapshotFormatter
 {
+    /// <summary>
+    /// Renders a full <see cref="SystemSnapshot"/> as a multi-section plain-text report
+    /// (OS, CPU, memory, drives, network adapters, temperatures, GPUs).
+    /// Sizes are formatted with binary (IEC) units, e.g. <c>"15.6 GiB"</c>.
+    /// </summary>
     public static string ToReadableString(this SystemSnapshot snapshot)
     {
         var sb = new StringBuilder();
@@ -130,6 +139,11 @@ public static class SnapshotFormatter
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Renders a battery list as a <c>-- Batteries --</c> section. Use this alongside
+    /// <see cref="ToReadableString"/> when you also want battery info in the output —
+    /// batteries are not part of <see cref="SystemSnapshot"/>.
+    /// </summary>
     public static string FormatBatteries(this IReadOnlyList<BatteryInfo> batteries)
     {
         var sb = new StringBuilder();
