@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/demo/">
+    <Project Path="../DeepSigma.SystemDiagnostics.Demo/DeepSigma.SystemDiagnostics.Demo.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="DeepSigma.SystemDiagnostics.csproj" />
+  </Folder>
+  <Folder Name="/test/" />
+  <Project Path="../DeepSigma.SystemDiagnostics.Test/DeepSigma.SystemDiagnostics.Test.csproj" />
+</Solution>
