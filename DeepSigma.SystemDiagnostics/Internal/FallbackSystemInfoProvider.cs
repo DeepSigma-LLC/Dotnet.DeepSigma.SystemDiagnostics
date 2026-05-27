@@ -15,4 +15,9 @@ internal sealed class FallbackSystemInfoProvider : SystemInfoProviderBase
     public override MemoryInfo GetMemory() => new(TotalBytes: 0, AvailableBytes: null);
 
     public override IReadOnlyList<GpuInfo> GetGpus() => Array.Empty<GpuInfo>();
+
+    public override IReadOnlyList<BatteryInfo> GetBatteries() => Array.Empty<BatteryInfo>();
+
+    public override IReadOnlyList<TemperatureReading> GetTemperatures() =>
+        Array.Empty<TemperatureReading>();
 }

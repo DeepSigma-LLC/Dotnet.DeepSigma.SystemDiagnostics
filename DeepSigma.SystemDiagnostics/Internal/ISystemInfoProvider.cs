@@ -10,4 +10,6 @@ internal interface ISystemInfoProvider
     IReadOnlyList<DriveInfoRecord> GetDrives();
     IReadOnlyList<NetworkAdapterInfo> GetNetworkAdapters();
     IReadOnlyList<GpuInfo> GetGpus();
+    IReadOnlyList<BatteryInfo> GetBatteries();
+    IReadOnlyList<TemperatureReading> GetTemperatures();
 }

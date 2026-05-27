@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
 
     <PackageId>DeepSigma.SystemDiagnostics</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.3.2</Version>
     <Authors>DeepSigma</Authors>
     <Company>DeepSigma</Company>
     <Description>Cross-platform (Windows/Linux) system diagnostics: OS, CPU, memory, drives, network, GPU. Returns immutable record structures suitable for branching application logic on host capabilities.</Description>
@@ -30,6 +30,10 @@
 
   <ItemGroup>
     <PackageReference Include="System.Management" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DeepSigma.SystemDiagnostics.Test" />
   </ItemGroup>
 
 </Project>

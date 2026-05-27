@@ -10,13 +10,25 @@ internal abstract class SystemInfoProviderBase : ISystemInfoProvider
 {
     public virtual OperatingSystemInfo GetOperatingSystem()
     {
+        var family = DetectFamily();
         return new OperatingSystemInfo(
-            Family: DetectFamily(),
+            Family: family,
             Description: RuntimeInformation.OSDescription,
-            Version: Environment.OSVersion.Version.ToString(),
+            Version: FormatVersion(family, Environment.OSVersion.Version),
             MachineName: Environment.MachineName,
             UserName: Environment.UserName,
             Is64Bit: Environment.Is64BitOperatingSystem);
+    }
+
+    // The Environment.OSVersion.Version on Windows reports the NT version (10.0.x) for both
+    // Windows 10 and Windows 11. The consumer-facing convention is that build >= 22000 == Win11.
+    // Translate so the Version field reflects what users expect; the raw NT description is still
+    // available via OperatingSystemInfo.Description.
+    private static string FormatVersion(OSFamily family, Version v)
+    {
+        if (family == OSFamily.Windows && v.Major == 10 && v.Build >= 22000)
+            return $"11.0.{v.Build}.{v.Revision}";
+        return v.ToString();
     }
 
     public abstract CpuInfo GetCpu();
@@ -26,7 +38,16 @@ internal abstract class SystemInfoProviderBase : ISystemInfoProvider
     public virtual IReadOnlyList<DriveInfoRecord> GetDrives()
     {
         var result = new List<DriveInfoRecord>();
-        foreach (var drive in IoDriveInfo.GetDrives())
+
+        IoDriveInfo[] drives;
+        try
+        {
+            drives = IoDriveInfo.GetDrives();
+        }
+        catch (IOException) { return result; }
+        catch (UnauthorizedAccessException) { return result; }
+
+        foreach (var drive in drives)
         {
             ulong total = 0, free = 0;
             string? label = null, fs = null;
@@ -40,10 +61,8 @@ internal abstract class SystemInfoProviderBase : ISystemInfoProvider
                     label = drive.VolumeLabel;
                     fs = drive.DriveFormat;
                 }
-                catch
-                {
-                    ready = false;
-                }
+                catch (IOException) { ready = false; }
+                catch (UnauthorizedAccessException) { ready = false; }
             }
 
             result.Add(new DriveInfoRecord(
@@ -61,7 +80,16 @@ internal abstract class SystemInfoProviderBase : ISystemInfoProvider
     public virtual IReadOnlyList<NetworkAdapterInfo> GetNetworkAdapters()
     {
         var result = new List<NetworkAdapterInfo>();
-        foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+
+        NetworkInterface[] nics;
+        try
+        {
+            nics = NetworkInterface.GetAllNetworkInterfaces();
+        }
+        catch (NetworkInformationException) { return result; }
+        catch (PlatformNotSupportedException) { return result; }
+
+        foreach (var nic in nics)
         {
             var ipv4 = new List<string>();
             var ipv6 = new List<string>();
@@ -75,9 +103,8 @@ internal abstract class SystemInfoProviderBase : ISystemInfoProvider
                         ipv6.Add(addr.Address.ToString());
                 }
             }
-            catch
-            {
-            }
+            catch (NetworkInformationException) { }
+            catch (PlatformNotSupportedException) { }
 
             result.Add(new NetworkAdapterInfo(
                 Id: nic.Id,
@@ -94,6 +121,10 @@ internal abstract class SystemInfoProviderBase : ISystemInfoProvider
     }
 
     public abstract IReadOnlyList<GpuInfo> GetGpus();
+
+    public abstract IReadOnlyList<BatteryInfo> GetBatteries();
+
+    public abstract IReadOnlyList<TemperatureReading> GetTemperatures();
 
     protected static int LogicalCoreCount() => Environment.ProcessorCount;
 

@@ -1,4 +1,5 @@
 using System.Management;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
 namespace DeepSigma.SystemDiagnostics.Internal.Windows;
@@ -13,10 +14,9 @@ internal static class WmiHelper
         {
             searcher = new ManagementObjectSearcher(wql);
         }
-        catch
-        {
-            yield break;
-        }
+        catch (ManagementException) { yield break; }
+        catch (COMException) { yield break; }
+        catch (UnauthorizedAccessException) { yield break; }
 
         using (searcher)
         {
@@ -25,10 +25,9 @@ internal static class WmiHelper
             {
                 collection = searcher.Get();
             }
-            catch
-            {
-                yield break;
-            }
+            catch (ManagementException) { yield break; }
+            catch (COMException) { yield break; }
+            catch (UnauthorizedAccessException) { yield break; }
 
             using (collection)
             {
@@ -48,10 +47,10 @@ internal static class WmiHelper
             if (raw is null) return null;
             return (T)Convert.ChangeType(raw, typeof(T));
         }
-        catch
-        {
-            return null;
-        }
+        catch (ManagementException) { return null; }
+        catch (InvalidCastException) { return null; }
+        catch (OverflowException) { return null; }
+        catch (FormatException) { return null; }
     }
 
     public static string? ReadString(ManagementBaseObject obj, string property)
@@ -60,7 +59,7 @@ internal static class WmiHelper
         {
             return obj[property]?.ToString();
         }
-        catch
+        catch (ManagementException)
         {
             return null;
         }

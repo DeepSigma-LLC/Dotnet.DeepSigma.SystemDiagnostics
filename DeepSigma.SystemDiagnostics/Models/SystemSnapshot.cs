@@ -7,4 +7,5 @@ public sealed record SystemSnapshot(
     MemoryInfo Memory,
     IReadOnlyList<DriveInfoRecord> Drives,
     IReadOnlyList<NetworkAdapterInfo> NetworkAdapters,
-    IReadOnlyList<GpuInfo> Gpus);
+    IReadOnlyList<GpuInfo> Gpus,
+    IReadOnlyList<TemperatureReading> Temperatures);

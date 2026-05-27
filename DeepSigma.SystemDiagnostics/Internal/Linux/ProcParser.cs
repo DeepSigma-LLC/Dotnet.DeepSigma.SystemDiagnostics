@@ -21,20 +21,17 @@ internal static class ProcParser
                     dict[key] = value;
             }
         }
-        catch
-        {
-        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
         return dict;
     }
 
-    public static (string Name, string Vendor, int? PhysicalCores, double? MaxClockMHz) ParseCpuInfo()
+    public static (string Name, string Vendor, int? PhysicalCores) ParseCpuInfo()
     {
         string name = string.Empty;
         string vendor = string.Empty;
-        double? maxClockMHz = null;
         var coreIds = new HashSet<string>(StringComparer.Ordinal);
         string? currentPhysicalId = null;
-        var physicalIds = new HashSet<string>(StringComparer.Ordinal);
 
         try
         {
@@ -56,32 +53,59 @@ internal static class ProcParser
                         break;
                     case "physical id":
                         currentPhysicalId = value;
-                        physicalIds.Add(value);
                         break;
                     case "core id":
                         coreIds.Add($"{currentPhysicalId ?? "0"}:{value}");
                         break;
-                    case "cpu MHz":
-                        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var mhz))
-                        {
-                            if (!maxClockMHz.HasValue || mhz > maxClockMHz.Value)
-                                maxClockMHz = mhz;
-                        }
-                        break;
                 }
             }
         }
-        catch
-        {
-        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
 
         int? physicalCores = coreIds.Count > 0 ? coreIds.Count : null;
 
         return (
             string.IsNullOrEmpty(name) ? "Unknown" : name,
             string.IsNullOrEmpty(vendor) ? "Unknown" : vendor,
-            physicalCores,
-            maxClockMHz);
+            physicalCores);
+    }
+
+    // Reads the highest cpuinfo_max_freq across all CPUs. Returns true max clock (boost),
+    // not the current frequency. /proc/cpuinfo's "cpu MHz" reports the current frequency
+    // at sample time, which is misleading as a "max clock" value.
+    public static double? ReadMaxClockMHz()
+    {
+        const string root = "/sys/devices/system/cpu";
+        if (!Directory.Exists(root)) return null;
+
+        double? maxMHz = null;
+        try
+        {
+            foreach (var cpuDir in Directory.GetDirectories(root, "cpu[0-9]*"))
+            {
+                var path = Path.Combine(cpuDir, "cpufreq", "cpuinfo_max_freq");
+                if (!File.Exists(path)) continue;
+                string raw;
+                try
+                {
+                    raw = File.ReadAllText(path).Trim();
+                }
+                catch (IOException) { continue; }
+                catch (UnauthorizedAccessException) { continue; }
+
+                if (long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var kHz))
+                {
+                    var mhz = kHz / 1000.0;
+                    if (!maxMHz.HasValue || mhz > maxMHz.Value)
+                        maxMHz = mhz;
+                }
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+
+        return maxMHz;
     }
 
     public static (ulong TotalBytes, ulong? AvailableBytes) ParseMemInfo()
@@ -91,20 +115,20 @@ internal static class ProcParser
 
         var values = ReadKeyValueFile("/proc/meminfo", ':');
         if (values.TryGetValue("MemTotal", out var totalStr))
-            total = ParseKbValue(totalStr);
+            total = ParseKbValue(totalStr) ?? 0;
         if (values.TryGetValue("MemAvailable", out var availStr))
             available = ParseKbValue(availStr);
 
         return (total, available);
     }
 
-    private static ulong ParseKbValue(string raw)
+    private static ulong? ParseKbValue(string raw)
     {
         var trimmed = raw.Trim();
         if (trimmed.EndsWith(" kB", StringComparison.OrdinalIgnoreCase))
             trimmed = trimmed[..^3].Trim();
         return ulong.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out var kb)
             ? kb * 1024UL
-            : 0UL;
+            : null;
     }
 }

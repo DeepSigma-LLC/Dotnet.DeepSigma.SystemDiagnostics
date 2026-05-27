@@ -83,6 +83,31 @@ public static class SnapshotFormatter
         }
         sb.AppendLine();
 
+        sb.AppendLine("-- Temperatures --");
+        if (snapshot.Temperatures.Count == 0)
+        {
+            sb.AppendLine("  (no sensors available)");
+        }
+        else
+        {
+            foreach (var t in snapshot.Temperatures)
+            {
+                var label = string.IsNullOrEmpty(t.Label) ? "" : $" [{t.Label}]";
+                var thresholds = new List<string>();
+                if (t.MaxCelsius.HasValue)
+                    thresholds.Add(string.Format(CultureInfo.InvariantCulture, "max {0:0.#}°C", t.MaxCelsius.Value));
+                if (t.CritCelsius.HasValue)
+                    thresholds.Add(string.Format(CultureInfo.InvariantCulture, "crit {0:0.#}°C", t.CritCelsius.Value));
+                var thresholdStr = thresholds.Count > 0 ? $"  ({string.Join(", ", thresholds)})" : "";
+
+                sb.AppendLine(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "  {0}{1}: {2:0.#}°C{3}",
+                    t.ChipName, label, t.Celsius, thresholdStr));
+            }
+        }
+        sb.AppendLine();
+
         sb.AppendLine("-- GPUs --");
         if (snapshot.Gpus.Count == 0)
         {
@@ -105,7 +130,27 @@ public static class SnapshotFormatter
         return sb.ToString();
     }
 
-    public static string FormatBytes(ulong bytes)
+    public static string FormatBatteries(this IReadOnlyList<BatteryInfo> batteries)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("-- Batteries --");
+        if (batteries.Count == 0)
+        {
+            sb.AppendLine("  (no batteries detected)");
+            return sb.ToString();
+        }
+
+        foreach (var b in batteries)
+        {
+            var charge = b.ChargePercent.HasValue
+                ? $"{b.ChargePercent.Value}%"
+                : "(unknown)";
+            sb.AppendLine($"  {b.Name}  {charge}  {b.Status}  AC={b.IsOnAcPower}");
+        }
+        return sb.ToString();
+    }
+
+    private static string FormatBytes(ulong bytes)
     {
         if (bytes == 0) return "0 B";
         string[] units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];

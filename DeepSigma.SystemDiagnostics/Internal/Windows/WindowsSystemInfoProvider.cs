@@ -1,5 +1,6 @@
+using System.Management;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using DeepSigma.SystemDiagnostics.Enums;
 using DeepSigma.SystemDiagnostics.Models;
 
 namespace DeepSigma.SystemDiagnostics.Internal.Windows;
@@ -18,7 +19,7 @@ internal sealed class WindowsSystemInfoProvider : SystemInfoProviderBase
         try
         {
             foreach (var obj in WmiHelper.Query(
-                "SELECT Name, Manufacturer, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed FROM Win32_Processor"))
+                "SELECT Name, Manufacturer, NumberOfCores, MaxClockSpeed FROM Win32_Processor"))
             {
                 using (obj)
                 {
@@ -35,12 +36,11 @@ internal sealed class WindowsSystemInfoProvider : SystemInfoProviderBase
                     if (clock.HasValue && (!maxClockMHz.HasValue || clock.Value > maxClockMHz.Value))
                         maxClockMHz = clock.Value;
                 }
-                break;
             }
         }
-        catch
-        {
-        }
+        catch (ManagementException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (COMException) { }
 
         return new CpuInfo(
             Name: string.IsNullOrEmpty(name) ? "Unknown" : name,
@@ -68,9 +68,9 @@ internal sealed class WindowsSystemInfoProvider : SystemInfoProviderBase
                 break;
             }
         }
-        catch
-        {
-        }
+        catch (ManagementException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (COMException) { }
 
         return new MemoryInfo(
             TotalBytes: totalKb * 1024,
@@ -90,18 +90,67 @@ internal sealed class WindowsSystemInfoProvider : SystemInfoProviderBase
                     var name = (WmiHelper.ReadString(obj, "Name") ?? "Unknown").Trim();
                     var vendor = WmiHelper.ReadString(obj, "AdapterCompatibility")?.Trim();
                     var driver = WmiHelper.ReadString(obj, "DriverVersion")?.Trim();
+
+                    // Win32_VideoController.AdapterRAM is uint32, so values are capped at 4 GiB.
+                    // Modern GPUs with more VRAM report uint.MaxValue (or near it from wrap).
+                    // Treat the saturated value as unknown rather than misleadingly displaying 4 GiB.
                     var ram = WmiHelper.Read<uint>(obj, "AdapterRAM");
+                    ulong? ramBytes = ram switch
+                    {
+                        null => null,
+                        0 => null,
+                        uint.MaxValue => null,
+                        _ => ram.Value,
+                    };
+
                     result.Add(new GpuInfo(
                         Name: name,
                         Vendor: string.IsNullOrEmpty(vendor) ? null : vendor,
                         DriverVersion: string.IsNullOrEmpty(driver) ? null : driver,
-                        AdapterRamBytes: ram.HasValue ? (ulong)ram.Value : null));
+                        AdapterRamBytes: ramBytes));
                 }
             }
         }
-        catch
-        {
-        }
+        catch (ManagementException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (COMException) { }
         return result;
     }
+
+    public override IReadOnlyList<BatteryInfo> GetBatteries()
+    {
+        var result = new List<BatteryInfo>();
+        try
+        {
+            foreach (var obj in WmiHelper.Query(
+                "SELECT Name, BatteryStatus, EstimatedChargeRemaining FROM Win32_Battery"))
+            {
+                using (obj)
+                {
+                    var name = (WmiHelper.ReadString(obj, "Name") ?? "Battery").Trim();
+                    var code = WmiHelper.Read<ushort>(obj, "BatteryStatus");
+                    var charge = WmiHelper.Read<ushort>(obj, "EstimatedChargeRemaining");
+
+                    var (status, onAc) = BatteryStatusMapper.FromWindowsCode(code);
+                    result.Add(new BatteryInfo(
+                        Name: string.IsNullOrEmpty(name) ? "Battery" : name,
+                        ChargePercent: charge.HasValue ? (int)charge.Value : null,
+                        Status: status,
+                        IsOnAcPower: onAc));
+                }
+            }
+        }
+        catch (ManagementException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (COMException) { }
+        return result;
+    }
+
+    // Windows has no practical user-mode API for reading CPU/GPU/chipset temperatures.
+    // WMI MSAcpi_ThermalZoneTemperature requires elevation and returns junk or empty on most
+    // consumer hardware. The only reliable Windows sensor sources (LibreHardwareMonitor,
+    // OpenHardwareMonitor, vendor SDKs) load unsigned kernel drivers and require admin install,
+    // which would force this whole package to demand elevation. Intentionally returns empty.
+    public override IReadOnlyList<TemperatureReading> GetTemperatures() =>
+        Array.Empty<TemperatureReading>();
 }
